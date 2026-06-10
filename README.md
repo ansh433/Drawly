@@ -1,135 +1,118 @@
-# Turborepo starter
+# ExcaliDraw
 
-This Turborepo starter is maintained by the Turborepo core team.
+ExcaliDraw is a collaborative whiteboard monorepo. The primary app, `apps/frontend`, is a Next.js canvas experience where users can sign up, create or join rooms, draw shapes in real time, and reload persisted drawings from the database.
 
-## Using this example
+## Tech Stack
 
-Run the following command:
+- **Frontend:** Next.js, React, Tailwind CSS, Radix UI, Framer Motion
+- **HTTP API:** Express, JWT auth, bcrypt, Prisma
+- **Realtime:** WebSocket server with `ws`
+- **Database:** PostgreSQL via Prisma
+- **Workspace:** pnpm workspaces and Turborepo
+
+## Project Structure
+
+```txt
+apps/
+  frontend/      Main Drawly/ExcaliDraw web app
+  http-backend/  Express API for auth, rooms, and persisted canvas messages
+  ws-backend/    WebSocket server for realtime room updates
+  web/           Secondary Next.js app in the workspace
+packages/
+  db/            Prisma schema, migrations, generated client, and DB exports
+  common/        Shared Zod validation schemas
+  backend-common/Shared backend constants
+  ui/            Shared React UI primitives
+```
+
+## Prerequisites
+
+- Node.js 20 or newer
+- pnpm 9
+- PostgreSQL database
+
+## Setup
+
+Install dependencies:
 
 ```sh
-npx create-turbo@latest
+pnpm install
 ```
 
-## What's inside?
+Set the database URL in your shell before running backend or Prisma commands:
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```sh
+export DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/excalidraw"
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+The frontend defaults to the local backend URLs below:
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+```sh
+NEXT_PUBLIC_HTTP_BACKEND=http://localhost:3002
+NEXT_PUBLIC_WS_URL=ws://localhost:8080
 ```
 
-### Develop
+You only need to set those frontend variables if your backend runs somewhere else. The HTTP backend also accepts `FRONTEND_URL` for an additional allowed CORS origin.
 
-To develop all apps and packages, run the following command:
+Generate the Prisma client and build the database package:
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```sh
+pnpm --filter @repo/db build
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Run database migrations from the database package:
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+```sh
+pnpm --filter @repo/db exec prisma migrate deploy
 ```
 
-### Remote Caching
+## Development
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+Run the main services in separate terminals:
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+```sh
+pnpm --filter @repo/db build
+pnpm --filter http-backend dev
+pnpm --filter ws-backend dev
+pnpm --filter frontend dev
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+Default local ports:
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+- Frontend: `http://localhost:3000`
+- HTTP backend: `http://localhost:3002`
+- WebSocket backend: `ws://localhost:8080`
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
+You can also run all workspace dev tasks through Turborepo:
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+```sh
+pnpm dev
 ```
 
-## Useful Links
+## Useful Commands
 
-Learn more about the power of Turborepo:
+```sh
+pnpm build        # Build all apps and packages through Turborepo
+pnpm lint         # Run workspace lint tasks
+pnpm check-types  # Run workspace type checks
+pnpm format       # Format TS, TSX, and Markdown files
+```
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+## API Overview
+
+The HTTP backend exposes:
+
+- `POST /signup` - create a user and return a JWT
+- `POST /signin` - authenticate and return a JWT
+- `POST /room` - create a room for the authenticated user
+- `GET /rooms` - list rooms owned by the authenticated user
+- `GET /room/:slug` - look up a room by slug
+- `GET /chats/:roomId` - fetch persisted canvas messages for a room
+
+The WebSocket backend expects a JWT query parameter:
+
+```txt
+ws://localhost:8080?token=<jwt>
+```
+
+Clients send `join_room`, `leave_room`, and `chat` messages. Canvas shapes are persisted as chat messages and replayed when a room is reopened.
