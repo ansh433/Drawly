@@ -11,23 +11,49 @@ import bcrypt from "bcrypt";
 const app = express();
 app.use(express.json());
 
-const allowedOrigins = [
+const configuredOrigins = [
   process.env.FRONTEND_URL,
-  "http://localhost:3000"
-];
+  process.env.CORS_ORIGINS
+].flatMap((value) => value?.split(",") ?? []);
+
+function normalizeOrigin(origin: string) {
+  const trimmedOrigin = origin.trim();
+
+  if (!trimmedOrigin) {
+    return undefined;
+  }
+
+  try {
+    return new URL(trimmedOrigin).origin;
+  } catch {
+    console.warn(`Ignoring invalid CORS origin: ${trimmedOrigin}`);
+    return undefined;
+  }
+}
+
+const allowedOrigins = new Set(
+  [
+    ...configuredOrigins,
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://drawlyboard.vercel.app"
+  ]
+    .map(normalizeOrigin)
+    .filter((origin): origin is string => Boolean(origin))
+);
 
 app.use(cors({
   origin: function (origin, callback) {
     console.log("Incoming Origin:", origin);
-    console.log("Allowed Origins:", allowedOrigins);
+    console.log("Allowed Origins:", Array.from(allowedOrigins));
 
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.has(origin)) {
       return callback(null, true);
     } else {
-      console.log("❌ BLOCKED BY CORS");
+      console.log("Blocked by CORS");
       return callback(new Error("Not allowed by CORS"));
     }
   },
