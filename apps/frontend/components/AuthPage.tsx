@@ -1,12 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import type { AxiosError } from "axios";
+import { getPasswordRequirementResults } from "@repo/common/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signin, signup } from "@/draw/http";
+
+type ApiError = {
+  message?: string;
+  errors?: string[];
+};
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function getApiErrorMessage(error: unknown) {
+  const apiError = error as AxiosError<ApiError>;
+  return apiError.response?.data?.message ?? "Something went wrong. Try again.";
+}
 
 export function AuthPage({ isSignin }: { isSignin: boolean }) {
   const router = useRouter();
@@ -15,9 +32,32 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  async function handleSubmit() {
+  const passwordRequirements = useMemo(
+    () => getPasswordRequirementResults(password),
+    [password]
+  );
+  const emailIsValid = isValidEmail(email);
+  const nameIsValid = isSignin || name.trim().length > 0;
+  const passwordIsValid = isSignin
+    ? password.length > 0
+    : passwordRequirements.every((requirement) => requirement.isMet);
+  const formIsValid = emailIsValid && nameIsValid && passwordIsValid;
+  const showEmailError = submitted || email.length > 0;
+  const showNameError = !isSignin && (submitted || name.length > 0);
+  const showSigninPasswordError = isSignin && submitted;
+
+  async function handleSubmit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setError("");
+    setSubmitted(true);
+
+    if (!formIsValid) {
+      setError("Fix the highlighted fields before continuing.");
+      return;
+    }
+
     setLoading(true);
     try {
       const token = isSignin
@@ -25,10 +65,8 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
         : await signup(email, password, name);
       localStorage.setItem("token", token);
       router.push("/dashboard");
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.message ?? "Something went wrong. Try again."
-      );
+    } catch (e: unknown) {
+      setError(getApiErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -51,7 +89,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
             : "Sign up and start drawing for free."}
         </p>
 
-        <div className="flex flex-col gap-4">
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {!isSignin && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="name">Name</Label>
@@ -60,7 +98,17 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
                 placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                aria-invalid={!nameIsValid}
               />
+              {showNameError && !nameIsValid ? (
+                <p className="text-xs font-base text-red-600">
+                  Name is required. It does not need to be unique.
+                </p>
+              ) : (
+                <p className="text-xs font-base text-foreground/50">
+                  Names can be shared by multiple people.
+                </p>
+              )}
             </div>
           )}
 
@@ -72,7 +120,17 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={!emailIsValid}
             />
+            {showEmailError && !emailIsValid ? (
+                <p className="text-xs font-base text-red-600">
+                  Enter a valid email address.
+                </p>
+            ) : (
+                <p className="text-xs font-base text-foreground/50">
+                  Email must be a valid address.
+                </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -83,8 +141,34 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              aria-invalid={!passwordIsValid}
             />
+            {isSignin ? (
+                <p className={`text-xs font-base ${
+                  showSigninPasswordError && !passwordIsValid
+                    ? "text-red-600"
+                    : "text-foreground/50"
+                }`}>
+                  Password is required.
+                </p>
+            ) : (
+              <div className="rounded-base border-2 border-border bg-background px-3 py-2">
+                <p className="mb-1 text-xs font-heading">Password requirements</p>
+                <ul className="space-y-1">
+                  {passwordRequirements.map((requirement) => (
+                    <li
+                      key={requirement.id}
+                      className={`text-xs font-base ${
+                        requirement.isMet ? "text-green-700" : "text-red-600"
+                      }`}
+                    >
+                      {requirement.isMet ? "Met: " : "Missing: "}
+                      {requirement.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -96,8 +180,8 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
           <motion.div whileTap={{ scale: 0.97 }}>
             <Button
               className="w-full"
-              onClick={handleSubmit}
-              disabled={loading}
+              type="submit"
+              disabled={loading || !formIsValid}
             >
               {loading
                 ? "Please wait..."
@@ -106,7 +190,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
                 : "Create account"}
             </Button>
           </motion.div>
-        </div>
+        </form>
 
         <p className="text-sm font-base text-foreground/60 mt-6 text-center">
           {isSignin ? "Don't have an account?" : "Already have an account?"}{" "}

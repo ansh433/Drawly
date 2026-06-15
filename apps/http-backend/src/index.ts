@@ -11,6 +11,18 @@ import bcrypt from "bcrypt";
 const app = express();
 app.use(express.json());
 
+function getValidationMessages(error: { issues: { message: string }[] }) {
+    return error.issues.map((issue) => issue.message);
+}
+
+function getErrorCode(error: unknown) {
+    if (error && typeof error === "object" && "code" in error) {
+        return String(error.code);
+    }
+
+    return undefined;
+}
+
 const configuredOrigins = [
   process.env.FRONTEND_URL,
   process.env.CORS_ORIGINS
@@ -63,10 +75,22 @@ app.use(cors({
 app.post("/signup", async (req, res) => {
     const parsedData = CreateUserSchema.safeParse(req.body);
     if (!parsedData.success) {
-        res.status(400).json({ message: "Incorrect inputs" });
+        const errors = getValidationMessages(parsedData.error);
+        res.status(400).json({
+            message: errors[0] ?? "Please check your signup details.",
+            errors
+        });
         return;
     }
     try {
+        const existingUser = await prismaClient.user.findFirst({
+            where: { email: parsedData.data.username }
+        });
+        if (existingUser) {
+            res.status(409).json({ message: "An account with this email already exists." });
+            return;
+        }
+
         const hashedPassword = await bcrypt.hash(parsedData.data.password, 5);
         const user = await prismaClient.user.create({
             data: {
@@ -78,26 +102,35 @@ app.post("/signup", async (req, res) => {
         const token = jwt.sign({ userId: user.id }, JWT_SECRET);
         res.json({ token });
     } catch(e) {
-        res.status(411).json({ message: "User already exists with this username" });
+        if (getErrorCode(e) === "ETIMEDOUT") {
+            res.status(503).json({ message: "Could not reach the database. Try again in a moment." });
+            return;
+        }
+
+        res.status(500).json({ message: "Failed to create account. Try again." });
     }
 });
 
 app.post("/signin", async (req, res) => {
     const parsedData = SigninSchema.safeParse(req.body);
     if (!parsedData.success) {
-        res.status(400).json({ message: "Incorrect inputs" });
+        const errors = getValidationMessages(parsedData.error);
+        res.status(400).json({
+            message: errors[0] ?? "Please check your signin details.",
+            errors
+        });
         return;
     }
     const user = await prismaClient.user.findFirst({
         where: { email: parsedData.data.username }
     });
     if (!user) {
-        res.status(403).json({ message: "Not authorized" });
+        res.status(403).json({ message: "Email or password is incorrect." });
         return;
     }
     const passwordMatch = await bcrypt.compare(parsedData.data.password, user.password);
     if (!passwordMatch) {
-        res.status(403).json({ message: "Not authorized" });
+        res.status(403).json({ message: "Email or password is incorrect." });
         return;
     }
     const token = jwt.sign({ userId: user.id }, JWT_SECRET);

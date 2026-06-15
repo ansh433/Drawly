@@ -1,14 +1,63 @@
 import { z } from "zod";
 
+export const PASSWORD_REQUIREMENTS = [
+    {
+        id: "length",
+        label: "At least 8 characters",
+        isMet: (password: string) => password.length >= 8
+    },
+    {
+        id: "uppercase",
+        label: "At least one uppercase letter",
+        isMet: (password: string) => /[A-Z]/.test(password)
+    },
+    {
+        id: "lowercase",
+        label: "At least one lowercase letter",
+        isMet: (password: string) => /[a-z]/.test(password)
+    },
+    {
+        id: "number",
+        label: "At least one number",
+        isMet: (password: string) => /[0-9]/.test(password)
+    }
+] as const;
+
+export function getPasswordRequirementResults(password: string) {
+    return PASSWORD_REQUIREMENTS.map((requirement) => ({
+        id: requirement.id,
+        label: requirement.label,
+        isMet: requirement.isMet(password)
+    }));
+}
+
+const EmailSchema = z.string()
+    .trim()
+    .min(1, "Email is required.")
+    .email("Enter a valid email address.")
+    .transform((email) => email.toLowerCase());
+
+const SignupPasswordSchema = z.string()
+    .superRefine((password, ctx) => {
+        getPasswordRequirementResults(password).forEach((requirement) => {
+            if (!requirement.isMet) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: requirement.label
+                });
+            }
+        });
+    });
+
 export const CreateUserSchema = z.object({
-    username: z.string().min(3).max(20),
-    password: z.string(),
-    name: z.string()
+    username: EmailSchema,
+    password: SignupPasswordSchema,
+    name: z.string().trim().min(1, "Name is required.")
 })
 
 export const SigninSchema = z.object({
-    username: z.string().min(3).max(20),
-    password: z.string() 
+    username: EmailSchema,
+    password: z.string().min(1, "Password is required.")
 })
 
 export const CreateRoomSchema = z.object({
