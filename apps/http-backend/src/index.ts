@@ -151,6 +151,27 @@ app.get("/chats/:roomId", async (req, res) => {
     }
 });
 
+app.get("/shapes/:roomId", async (req, res) => {
+    try {
+        const roomId = Number(req.params.roomId);
+        if (!Number.isInteger(roomId)) {
+            res.status(400).json({ shapes: [] });
+            return;
+        }
+
+        const shapes = await prismaClient.canvasShape.findMany({
+            where: {
+                roomId,
+                deleted: false
+            },
+            orderBy: { createdAt: "asc" }
+        });
+        res.json({ shapes });
+    } catch(e) {
+        res.status(500).json({ shapes: [] });
+    }
+});
+
 app.get("/room/:slug", async (req, res) => {
     const slug = req.params.slug;
     const room = await prismaClient.room.findFirst({
