@@ -56,3 +56,8 @@ export type Room = Prisma.RoomModel
  * 
  */
 export type Chat = Prisma.ChatModel
+/**
+ * Model CanvasShape
+ * 
+ */
+export type CanvasShape = Prisma.CanvasShapeModel

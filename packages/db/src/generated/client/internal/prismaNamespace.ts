@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   User: 'User',
   Room: 'Room',
-  Chat: 'Chat'
+  Chat: 'Chat',
+  CanvasShape: 'CanvasShape'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "room" | "chat"
+    modelProps: "user" | "room" | "chat" | "canvasShape"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    CanvasShape: {
+      payload: Prisma.$CanvasShapePayload<ExtArgs>
+      fields: Prisma.CanvasShapeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CanvasShapeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CanvasShapeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>
+        }
+        findFirst: {
+          args: Prisma.CanvasShapeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CanvasShapeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>
+        }
+        findMany: {
+          args: Prisma.CanvasShapeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>[]
+        }
+        create: {
+          args: Prisma.CanvasShapeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>
+        }
+        createMany: {
+          args: Prisma.CanvasShapeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CanvasShapeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>[]
+        }
+        delete: {
+          args: Prisma.CanvasShapeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>
+        }
+        update: {
+          args: Prisma.CanvasShapeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>
+        }
+        deleteMany: {
+          args: Prisma.CanvasShapeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CanvasShapeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CanvasShapeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>[]
+        }
+        upsert: {
+          args: Prisma.CanvasShapeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CanvasShapePayload>
+        }
+        aggregate: {
+          args: Prisma.CanvasShapeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCanvasShape>
+        }
+        groupBy: {
+          args: Prisma.CanvasShapeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CanvasShapeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CanvasShapeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CanvasShapeCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -692,10 +767,25 @@ export const ChatScalarFieldEnum = {
   id: 'id',
   roomId: 'roomId',
   message: 'message',
-  userId: 'userId'
+  userId: 'userId',
+  createdAt: 'createdAt'
 } as const
 
 export type ChatScalarFieldEnum = (typeof ChatScalarFieldEnum)[keyof typeof ChatScalarFieldEnum]
+
+
+export const CanvasShapeScalarFieldEnum = {
+  id: 'id',
+  roomId: 'roomId',
+  userId: 'userId',
+  type: 'type',
+  data: 'data',
+  deleted: 'deleted',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CanvasShapeScalarFieldEnum = (typeof CanvasShapeScalarFieldEnum)[keyof typeof CanvasShapeScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -704,6 +794,13 @@ export const SortOrder = {
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -720,6 +817,15 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
 
@@ -767,6 +873,27 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 
@@ -881,6 +1008,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   room?: Prisma.RoomOmit
   chat?: Prisma.ChatOmit
+  canvasShape?: Prisma.CanvasShapeOmit
 }
 
 /* Types for Logging */
