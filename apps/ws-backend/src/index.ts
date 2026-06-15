@@ -132,6 +132,71 @@ wss.on('connection', function connection(ws, request) {
       });
     }
 
+    if (message.type === "shape:update") {
+      const roomId = Number(message.roomId);
+      if (!Number.isInteger(roomId)) {
+        return;
+      }
+
+      const updateResult = await prismaClient.canvasShape.updateMany({
+        where: {
+          id: message.shapeId,
+          roomId,
+          deleted: false
+        },
+        data: {
+          type: message.shapeType,
+          data: message.data
+        }
+      });
+
+      if (updateResult.count === 0) {
+        return;
+      }
+
+      const shape = await prismaClient.canvasShape.findUnique({
+        where: { id: message.shapeId }
+      });
+
+      if (!shape) {
+        return;
+      }
+
+      broadcastToRoom(message.roomId, {
+        type: "shape:updated",
+        roomId: message.roomId,
+        shape: serializeCanvasShape(shape)
+      });
+    }
+
+    if (message.type === "shape:delete") {
+      const roomId = Number(message.roomId);
+      if (!Number.isInteger(roomId)) {
+        return;
+      }
+
+      const deleteResult = await prismaClient.canvasShape.updateMany({
+        where: {
+          id: message.shapeId,
+          roomId,
+          deleted: false
+        },
+        data: {
+          deleted: true
+        }
+      });
+
+      if (deleteResult.count === 0) {
+        return;
+      }
+
+      broadcastToRoom(message.roomId, {
+        type: "shape:deleted",
+        roomId: message.roomId,
+        shapeId: message.shapeId
+      });
+    }
+
   } catch (error) {
     // Log the error but don't let it kill the server process
     console.error("WebSocket message error:", error);

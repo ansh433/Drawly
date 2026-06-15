@@ -65,6 +65,15 @@ export class Game {
             if (message.type === "shape:created" && message.roomId === this.roomId) {
                 this.existingShapes.push(shapeFromRecord(message.shape));
                 this.clearCanvas();
+            } else if (message.type === "shape:updated" && message.roomId === this.roomId) {
+                const updatedShape = shapeFromRecord(message.shape);
+                this.existingShapes = this.existingShapes.map((shape) => (
+                    shape.id === updatedShape.id ? updatedShape : shape
+                ));
+                this.clearCanvas();
+            } else if (message.type === "shape:deleted" && message.roomId === this.roomId) {
+                this.existingShapes = this.existingShapes.filter((shape) => shape.id !== message.shapeId);
+                this.clearCanvas();
             }
         };
     }
