@@ -1,21 +1,6 @@
 import { Tool } from "@/components/Canvas";
 import { getExistingShapes } from "./http";
-
-type Shape = {
-    type: "rect";
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-} | {
-    type: "circle";
-    centerX: number;
-    centerY: number;
-    radius: number;
-} | {
-    type: "pencil";
-    points: { x: number; y: number }[];
-}
+import { DEFAULT_SHAPE_STYLE, Shape, shapeFromRecord, shapeToPayload } from "./shapes";
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -77,9 +62,8 @@ export class Game {
     initHandlers() {
         this.socket.onmessage = (event) => {
             const message = JSON.parse(event.data);
-            if (message.type === "chat") {
-                const parsedShape = JSON.parse(message.message);
-                this.existingShapes.push(parsedShape.shape);
+            if (message.type === "shape:created" && message.roomId === this.roomId) {
+                this.existingShapes.push(shapeFromRecord(message.shape));
                 this.clearCanvas();
             }
         };
@@ -104,12 +88,22 @@ export class Game {
         ctx.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
 
         this.existingShapes.forEach((shape) => {
-            ctx.strokeStyle = "rgba(255, 255, 255)";
+            ctx.save();
+            ctx.strokeStyle = shape.strokeColor;
+            ctx.lineWidth = shape.strokeWidth;
             if (shape.type === "rect") {
+                if (shape.fillColor) {
+                    ctx.fillStyle = shape.fillColor;
+                    ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
+                }
                 ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
             } else if (shape.type === "circle") {
                 ctx.beginPath();
                 ctx.arc(shape.centerX, shape.centerY, Math.abs(shape.radius), 0, Math.PI * 2);
+                if (shape.fillColor) {
+                    ctx.fillStyle = shape.fillColor;
+                    ctx.fill();
+                }
                 ctx.stroke();
                 ctx.closePath();
             } else if (shape.type === "pencil") {
@@ -119,6 +113,7 @@ export class Game {
                 shape.points.slice(1).forEach((p) => ctx.lineTo(p.x, p.y));
                 ctx.stroke();
             }
+            ctx.restore();
         });
     }
 
@@ -154,6 +149,7 @@ export class Game {
 
         if (this.selectedTool === "rect") {
             shape = {
+                ...DEFAULT_SHAPE_STYLE,
                 type: "rect",
                 x: this.startX,
                 y: this.startY,
@@ -165,6 +161,7 @@ export class Game {
             const height = world.y - this.startY;
             const radius = Math.max(width, height) / 2;
             shape = {
+                ...DEFAULT_SHAPE_STYLE,
                 type: "circle",
                 radius,
                 centerX: this.startX + radius,
@@ -173,6 +170,8 @@ export class Game {
         } else if (this.selectedTool === "pencil") {
             if (this.pencilPoints.length > 1) {
                 shape = {
+                    ...DEFAULT_SHAPE_STYLE,
+                    fillColor: null,
                     type: "pencil",
                     points: this.pencilPoints,
                 };
@@ -182,11 +181,11 @@ export class Game {
 
         if (!shape) return;
 
-        this.existingShapes.push(shape);
+        const payload = shapeToPayload(shape);
         this.socket.send(JSON.stringify({
-            type: "chat",
-            message: JSON.stringify({ shape }),
+            type: "shape:create",
             roomId: this.roomId,
+            ...payload
         }));
     };
 
@@ -208,7 +207,8 @@ export class Game {
         const height = world.y - this.startY;
 
         this.clearCanvas();
-        this.ctx.strokeStyle = "rgba(255, 255, 255)";
+        this.ctx.strokeStyle = DEFAULT_SHAPE_STYLE.strokeColor;
+        this.ctx.lineWidth = DEFAULT_SHAPE_STYLE.strokeWidth;
 
         if (this.selectedTool === "rect") {
             this.ctx.strokeRect(this.startX, this.startY, width, height);

@@ -3,7 +3,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { JWT_SECRET } from '@repo/backend-common/config';
 import { prismaClient } from "@repo/db/client";
-
+import { ClientWebSocketEventSchema } from "@repo/common/types";
 
 
 const wss = new WebSocketServer({ port: 8080 });
@@ -15,6 +15,31 @@ interface User {
 }
 
 const users: User[] = [];
+
+function broadcastToRoom(roomId: string, message: unknown) {
+  users.forEach(user => {
+    if (user.rooms.includes(roomId) && user.ws.readyState === WebSocket.OPEN) {
+      user.ws.send(JSON.stringify(message));
+    }
+  });
+}
+
+function serializeCanvasShape(shape: {
+  id: string;
+  roomId: number;
+  userId: string;
+  type: string;
+  data: unknown;
+  deleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...shape,
+    createdAt: shape.createdAt.toISOString(),
+    updatedAt: shape.updatedAt.toISOString()
+  };
+}
 
 function checkUser(token: string): string | null {
   try {
@@ -65,39 +90,45 @@ wss.on('connection', function connection(ws, request) {
       parsedData = JSON.parse(data);
     }
 
-    if (parsedData.type === "join_room") {
-      const user = users.find(x => x.ws === ws);
-      user?.rooms.push(parsedData.roomId);
+    const parsedMessage = ClientWebSocketEventSchema.safeParse(parsedData);
+    if (!parsedMessage.success) {
+      return;
     }
 
-    if (parsedData.type === "leave_room") {
+    const message = parsedMessage.data;
+
+    if (message.type === "join_room") {
+      const user = users.find(x => x.ws === ws);
+      if (user && !user.rooms.includes(message.roomId)) {
+        user.rooms.push(message.roomId);
+      }
+    }
+
+    if (message.type === "leave_room") {
       const user = users.find(x => x.ws === ws);
       if (!user) return;
-      user.rooms = user.rooms.filter(x => x !== parsedData.room);
+      user.rooms = user.rooms.filter(x => x !== message.roomId);
     }
 
-    if (parsedData.type === "chat") {
-      const roomId = parsedData.roomId;
-      const message = parsedData.message;
+    if (message.type === "shape:create") {
+      const roomId = Number(message.roomId);
+      if (!Number.isInteger(roomId)) {
+        return;
+      }
 
-      // Persist the message to the database
-      await prismaClient.chat.create({
+      const shape = await prismaClient.canvasShape.create({
         data: {
-          roomId: Number(roomId),
-          message,
+          roomId,
+          type: message.shapeType,
+          data: message.data,
           userId
         }
       });
 
-      // Broadcast to everyone in the same room
-      users.forEach(user => {
-        if (user.rooms.includes(roomId)) {
-          user.ws.send(JSON.stringify({
-            type: "chat",
-            message: message,
-            roomId
-          }));
-        }
+      broadcastToRoom(message.roomId, {
+        type: "shape:created",
+        roomId: message.roomId,
+        shape: serializeCanvasShape(shape)
       });
     }
 

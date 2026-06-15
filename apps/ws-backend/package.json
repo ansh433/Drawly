@@ -9,10 +9,11 @@
     "dev": "npm run build && npm run start"
   },
   "dependencies": {
-    "jsonwebtoken": "^9.0.3",
-    "ws": "^8.19.0",
+    "@repo/common": "workspace:*",
     "@repo/db": "workspace:*",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
