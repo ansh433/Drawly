@@ -1,6 +1,6 @@
 import { Tool } from "@/components/Canvas";
 import { getExistingShapes } from "./http";
-import { DEFAULT_SHAPE_STYLE, Shape, shapeFromRecord, shapeToPayload } from "./shapes";
+import { cloneShape, DEFAULT_SHAPE_STYLE, Shape, shapeFromRecord, shapeToPayload, translateShape } from "./shapes";
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -13,6 +13,9 @@ export class Game {
     private selectedTool: Tool = "circle";
     private selectedShapeId: string | null = null;
     private onSelectionChange: (shapeId: string | null) => void;
+    private movingShapeId: string | null = null;
+    private moveStartShape: Shape | null = null;
+    private hasMovedShape = false;
 
     // Pencil
     private pencilPoints: { x: number; y: number }[] = [];
@@ -293,8 +296,13 @@ export class Game {
 
         if (this.selectedTool === "select") {
             const selectedShape = this.getShapeAt(world);
-            this.setSelectedShape(selectedShape?.id ?? null);
-            this.clicked = false;
+            const selectedShapeId = selectedShape?.id ?? null;
+
+            this.setSelectedShape(selectedShapeId);
+            this.movingShapeId = selectedShapeId;
+            this.moveStartShape = selectedShape ? cloneShape(selectedShape) : null;
+            this.hasMovedShape = false;
+            this.clicked = Boolean(selectedShapeId);
             this.clearCanvas();
             return;
         }
@@ -312,6 +320,27 @@ export class Game {
 
         this.clicked = false;
         const world = this.toWorld(e.clientX, e.clientY);
+
+        if (this.movingShapeId && this.moveStartShape) {
+            const movingShapeId = this.movingShapeId;
+            const movedShape = this.existingShapes.find((shape) => shape.id === movingShapeId);
+            const shouldPersistMove = Boolean(movedShape && this.hasMovedShape);
+
+            this.movingShapeId = null;
+            this.moveStartShape = null;
+            this.hasMovedShape = false;
+
+            if (movedShape && shouldPersistMove) {
+                const payload = shapeToPayload(movedShape);
+                this.socket.send(JSON.stringify({
+                    type: "shape:update",
+                    roomId: this.roomId,
+                    shapeId: movingShapeId,
+                    ...payload
+                }));
+            }
+            return;
+        }
 
         let shape: Shape | null = null;
 
@@ -371,6 +400,20 @@ export class Game {
         if (!this.clicked) return;
 
         const world = this.toWorld(e.clientX, e.clientY);
+
+        if (this.movingShapeId && this.moveStartShape) {
+            const dx = world.x - this.startX;
+            const dy = world.y - this.startY;
+            const movedShape = translateShape(this.moveStartShape, dx, dy);
+
+            this.hasMovedShape = Math.abs(dx) > 0 || Math.abs(dy) > 0;
+            this.existingShapes = this.existingShapes.map((shape) => (
+                shape.id === this.movingShapeId ? movedShape : shape
+            ));
+            this.clearCanvas();
+            return;
+        }
+
         const width = world.x - this.startX;
         const height = world.y - this.startY;
 

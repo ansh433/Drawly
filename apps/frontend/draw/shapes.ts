@@ -118,3 +118,40 @@ export function shapeToPayload(shape: Shape) {
         }
     };
 }
+
+export function cloneShape(shape: Shape): Shape {
+    if (shape.type === "pencil") {
+        return {
+            ...shape,
+            points: shape.points.map((point) => ({ ...point }))
+        };
+    }
+
+    return { ...shape };
+}
+
+export function translateShape(shape: Shape, dx: number, dy: number): Shape {
+    if (shape.type === "rect") {
+        return {
+            ...shape,
+            x: shape.x + dx,
+            y: shape.y + dy
+        };
+    }
+
+    if (shape.type === "circle") {
+        return {
+            ...shape,
+            centerX: shape.centerX + dx,
+            centerY: shape.centerY + dy
+        };
+    }
+
+    return {
+        ...shape,
+        points: shape.points.map((point) => ({
+            x: point.x + dx,
+            y: point.y + dy
+        }))
+    };
+}
