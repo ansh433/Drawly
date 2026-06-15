@@ -11,6 +11,8 @@ export class Game {
     private startX = 0;
     private startY = 0;
     private selectedTool: Tool = "circle";
+    private selectedShapeId: string | null = null;
+    private onSelectionChange: (shapeId: string | null) => void;
 
     // Pencil
     private pencilPoints: { x: number; y: number }[] = [];
@@ -28,13 +30,19 @@ export class Game {
 
     socket: WebSocket;
 
-    constructor(canvas: HTMLCanvasElement, roomId: string, socket: WebSocket) {
+    constructor(
+        canvas: HTMLCanvasElement,
+        roomId: string,
+        socket: WebSocket,
+        onSelectionChange: (shapeId: string | null) => void
+    ) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d")!;
         this.existingShapes = [];
         this.roomId = roomId;
         this.socket = socket;
         this.clicked = false;
+        this.onSelectionChange = onSelectionChange;
         this.init();
         this.initHandlers();
         this.initMouseHandlers();
@@ -52,6 +60,18 @@ export class Game {
 
     setTool(tool: Tool) {
         this.selectedTool = tool;
+    }
+
+    deleteSelectedShape() {
+        if (!this.selectedShapeId) {
+            return;
+        }
+
+        this.socket.send(JSON.stringify({
+            type: "shape:delete",
+            roomId: this.roomId,
+            shapeId: this.selectedShapeId
+        }));
     }
 
     async init() {
@@ -73,6 +93,9 @@ export class Game {
                 this.clearCanvas();
             } else if (message.type === "shape:deleted" && message.roomId === this.roomId) {
                 this.existingShapes = this.existingShapes.filter((shape) => shape.id !== message.shapeId);
+                if (this.selectedShapeId === message.shapeId) {
+                    this.setSelectedShape(null);
+                }
                 this.clearCanvas();
             }
         };
@@ -84,6 +107,130 @@ export class Game {
             x: (screenX - this.panX) / this.scale,
             y: (screenY - this.panY) / this.scale,
         };
+    }
+
+    private setSelectedShape(shapeId: string | null) {
+        this.selectedShapeId = shapeId;
+        this.onSelectionChange(shapeId);
+    }
+
+    private getShapeBounds(shape: Shape) {
+        if (shape.type === "rect") {
+            return {
+                x: Math.min(shape.x, shape.x + shape.width),
+                y: Math.min(shape.y, shape.y + shape.height),
+                width: Math.abs(shape.width),
+                height: Math.abs(shape.height)
+            };
+        }
+
+        if (shape.type === "circle") {
+            const radius = Math.abs(shape.radius);
+            return {
+                x: shape.centerX - radius,
+                y: shape.centerY - radius,
+                width: radius * 2,
+                height: radius * 2
+            };
+        }
+
+        const xs = shape.points.map((point) => point.x);
+        const ys = shape.points.map((point) => point.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
+
+        return {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        };
+    }
+
+    private drawSelectionOutline(shape: Shape) {
+        const bounds = this.getShapeBounds(shape);
+        const padding = 6 / this.scale;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = "#38bdf8";
+        this.ctx.lineWidth = 2 / this.scale;
+        this.ctx.setLineDash([6 / this.scale, 4 / this.scale]);
+        this.ctx.strokeRect(
+            bounds.x - padding,
+            bounds.y - padding,
+            bounds.width + padding * 2,
+            bounds.height + padding * 2
+        );
+        this.ctx.restore();
+    }
+
+    private getShapeAt(point: { x: number; y: number }) {
+        const tolerance = 8 / this.scale;
+
+        for (let i = this.existingShapes.length - 1; i >= 0; i--) {
+            const shape = this.existingShapes[i];
+            if (!shape?.id) {
+                continue;
+            }
+
+            if (this.isPointInShape(point, shape, tolerance)) {
+                return shape;
+            }
+        }
+
+        return null;
+    }
+
+    private isPointInShape(point: { x: number; y: number }, shape: Shape, tolerance: number) {
+        if (shape.type === "rect") {
+            const bounds = this.getShapeBounds(shape);
+            return (
+                point.x >= bounds.x - tolerance &&
+                point.x <= bounds.x + bounds.width + tolerance &&
+                point.y >= bounds.y - tolerance &&
+                point.y <= bounds.y + bounds.height + tolerance
+            );
+        }
+
+        if (shape.type === "circle") {
+            const distance = Math.hypot(point.x - shape.centerX, point.y - shape.centerY);
+            return distance <= Math.abs(shape.radius) + tolerance;
+        }
+
+        for (let i = 1; i < shape.points.length; i++) {
+            const start = shape.points[i - 1];
+            const end = shape.points[i];
+            if (this.distanceToSegment(point, start, end) <= tolerance) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private distanceToSegment(
+        point: { x: number; y: number },
+        start: { x: number; y: number },
+        end: { x: number; y: number }
+    ) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+
+        if (dx === 0 && dy === 0) {
+            return Math.hypot(point.x - start.x, point.y - start.y);
+        }
+
+        const segmentLengthSquared = dx * dx + dy * dy;
+        const projectedDistance = (point.x - start.x) * dx + (point.y - start.y) * dy;
+        const t = Math.max(0, Math.min(1, projectedDistance / segmentLengthSquared));
+        const projection = {
+            x: start.x + t * dx,
+            y: start.y + t * dy
+        };
+
+        return Math.hypot(point.x - projection.x, point.y - projection.y);
     }
 
     clearCanvas() {
@@ -123,6 +270,10 @@ export class Game {
                 ctx.stroke();
             }
             ctx.restore();
+
+            if (shape.id && shape.id === this.selectedShapeId) {
+                this.drawSelectionOutline(shape);
+            }
         });
     }
 
@@ -139,6 +290,14 @@ export class Game {
         const world = this.toWorld(e.clientX, e.clientY);
         this.startX = world.x;
         this.startY = world.y;
+
+        if (this.selectedTool === "select") {
+            const selectedShape = this.getShapeAt(world);
+            this.setSelectedShape(selectedShape?.id ?? null);
+            this.clicked = false;
+            this.clearCanvas();
+            return;
+        }
 
         if (this.selectedTool === "pencil") {
             this.pencilPoints = [{ x: world.x, y: world.y }];
@@ -256,6 +415,12 @@ export class Game {
     };
 
     keyDownHandler = (e: KeyboardEvent) => {
+        if ((e.key === "Backspace" || e.key === "Delete") && this.selectedShapeId) {
+            e.preventDefault();
+            this.deleteSelectedShape();
+            return;
+        }
+
         if (e.code === "Space") {
             this.isSpaceDown = true;
             this.canvas.style.cursor = "grab";
