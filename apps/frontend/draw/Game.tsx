@@ -1,6 +1,6 @@
-import { Tool } from "@/components/Canvas";
+import type { Tool } from "@/components/Canvas";
 import { getExistingShapes } from "./http";
-import { cloneShape, DEFAULT_SHAPE_STYLE, Shape, shapeFromRecord, shapeToPayload, translateShape } from "./shapes";
+import { cloneShape, DEFAULT_SHAPE_STYLE, Shape, ShapeStyle, shapeFromRecord, shapeToPayload, translateShape } from "./shapes";
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -12,7 +12,8 @@ export class Game {
     private startY = 0;
     private selectedTool: Tool = "circle";
     private selectedShapeId: string | null = null;
-    private onSelectionChange: (shapeId: string | null) => void;
+    private activeStyle: ShapeStyle = DEFAULT_SHAPE_STYLE;
+    private onSelectionChange: (shape: Shape | null) => void;
     private movingShapeId: string | null = null;
     private moveStartShape: Shape | null = null;
     private hasMovedShape = false;
@@ -37,7 +38,7 @@ export class Game {
         canvas: HTMLCanvasElement,
         roomId: string,
         socket: WebSocket,
-        onSelectionChange: (shapeId: string | null) => void
+        onSelectionChange: (shape: Shape | null) => void
     ) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d")!;
@@ -63,6 +64,33 @@ export class Game {
 
     setTool(tool: Tool) {
         this.selectedTool = tool;
+    }
+
+    setStyle(style: ShapeStyle) {
+        this.activeStyle = { ...style };
+    }
+
+    updateSelectedShapeStyle(style: ShapeStyle) {
+        const selectedShape = this.getSelectedShape();
+
+        if (!selectedShape?.id) {
+            return;
+        }
+
+        const updatedShape = this.applyStyleToShape(selectedShape, style);
+        this.existingShapes = this.existingShapes.map((shape) => (
+            shape.id === updatedShape.id ? updatedShape : shape
+        ));
+        this.onSelectionChange(updatedShape);
+        this.clearCanvas();
+
+        const payload = shapeToPayload(updatedShape);
+        this.socket.send(JSON.stringify({
+            type: "shape:update",
+            roomId: this.roomId,
+            shapeId: updatedShape.id,
+            ...payload
+        }));
     }
 
     deleteSelectedShape() {
@@ -93,6 +121,9 @@ export class Game {
                 this.existingShapes = this.existingShapes.map((shape) => (
                     shape.id === updatedShape.id ? updatedShape : shape
                 ));
+                if (this.selectedShapeId === updatedShape.id) {
+                    this.onSelectionChange(updatedShape);
+                }
                 this.clearCanvas();
             } else if (message.type === "shape:deleted" && message.roomId === this.roomId) {
                 this.existingShapes = this.existingShapes.filter((shape) => shape.id !== message.shapeId);
@@ -112,9 +143,30 @@ export class Game {
         };
     }
 
-    private setSelectedShape(shapeId: string | null) {
-        this.selectedShapeId = shapeId;
-        this.onSelectionChange(shapeId);
+    private setSelectedShape(shape: Shape | null) {
+        this.selectedShapeId = shape?.id ?? null;
+        this.onSelectionChange(shape);
+    }
+
+    private getSelectedShape() {
+        return this.existingShapes.find((shape) => shape.id === this.selectedShapeId) ?? null;
+    }
+
+    private getActiveStyle(tool: Tool): ShapeStyle {
+        return {
+            strokeColor: this.activeStyle.strokeColor,
+            fillColor: tool === "pencil" ? null : this.activeStyle.fillColor,
+            strokeWidth: this.activeStyle.strokeWidth
+        };
+    }
+
+    private applyStyleToShape(shape: Shape, style: ShapeStyle): Shape {
+        return {
+            ...shape,
+            strokeColor: style.strokeColor,
+            fillColor: shape.type === "pencil" ? null : style.fillColor,
+            strokeWidth: style.strokeWidth
+        };
     }
 
     private getShapeBounds(shape: Shape) {
@@ -267,6 +319,8 @@ export class Game {
                 ctx.closePath();
             } else if (shape.type === "pencil") {
                 if (shape.points.length < 2) return;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
                 ctx.beginPath();
                 ctx.moveTo(shape.points[0].x, shape.points[0].y);
                 shape.points.slice(1).forEach((p) => ctx.lineTo(p.x, p.y));
@@ -298,7 +352,7 @@ export class Game {
             const selectedShape = this.getShapeAt(world);
             const selectedShapeId = selectedShape?.id ?? null;
 
-            this.setSelectedShape(selectedShapeId);
+            this.setSelectedShape(selectedShape);
             this.movingShapeId = selectedShapeId;
             this.moveStartShape = selectedShape ? cloneShape(selectedShape) : null;
             this.hasMovedShape = false;
@@ -343,10 +397,11 @@ export class Game {
         }
 
         let shape: Shape | null = null;
+        const style = this.getActiveStyle(this.selectedTool);
 
         if (this.selectedTool === "rect") {
             shape = {
-                ...DEFAULT_SHAPE_STYLE,
+                ...style,
                 type: "rect",
                 x: this.startX,
                 y: this.startY,
@@ -358,7 +413,7 @@ export class Game {
             const height = world.y - this.startY;
             const radius = Math.max(width, height) / 2;
             shape = {
-                ...DEFAULT_SHAPE_STYLE,
+                ...style,
                 type: "circle",
                 radius,
                 centerX: this.startX + radius,
@@ -367,7 +422,7 @@ export class Game {
         } else if (this.selectedTool === "pencil") {
             if (this.pencilPoints.length > 1) {
                 shape = {
-                    ...DEFAULT_SHAPE_STYLE,
+                    ...style,
                     fillColor: null,
                     type: "pencil",
                     points: this.pencilPoints,
@@ -418,21 +473,32 @@ export class Game {
         const height = world.y - this.startY;
 
         this.clearCanvas();
-        this.ctx.strokeStyle = DEFAULT_SHAPE_STYLE.strokeColor;
-        this.ctx.lineWidth = DEFAULT_SHAPE_STYLE.strokeWidth;
+        const style = this.getActiveStyle(this.selectedTool);
+        this.ctx.strokeStyle = style.strokeColor;
+        this.ctx.lineWidth = style.strokeWidth;
 
         if (this.selectedTool === "rect") {
+            if (style.fillColor) {
+                this.ctx.fillStyle = style.fillColor;
+                this.ctx.fillRect(this.startX, this.startY, width, height);
+            }
             this.ctx.strokeRect(this.startX, this.startY, width, height);
         } else if (this.selectedTool === "circle") {
             const radius = Math.max(width, height) / 2;
             this.ctx.beginPath();
             this.ctx.arc(this.startX + radius, this.startY + radius, Math.abs(radius), 0, Math.PI * 2);
+            if (style.fillColor) {
+                this.ctx.fillStyle = style.fillColor;
+                this.ctx.fill();
+            }
             this.ctx.stroke();
             this.ctx.closePath();
         } else if (this.selectedTool === "pencil") {
             this.pencilPoints.push({ x: world.x, y: world.y });
             // Draw current pencil stroke in progress
             if (this.pencilPoints.length > 1) {
+                this.ctx.lineCap = "round";
+                this.ctx.lineJoin = "round";
                 this.ctx.beginPath();
                 this.ctx.moveTo(this.pencilPoints[0].x, this.pencilPoints[0].y);
                 this.pencilPoints.slice(1).forEach((p) => this.ctx.lineTo(p.x, p.y));
