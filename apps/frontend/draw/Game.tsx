@@ -31,6 +31,28 @@ export class Game {
 
     // Zoom
     private scale = 1;
+    private socketMessageHandler = (event: MessageEvent) => {
+        const message = JSON.parse(event.data);
+        if (message.type === "shape:created" && message.roomId === this.roomId) {
+            this.existingShapes.push(shapeFromRecord(message.shape));
+            this.clearCanvas();
+        } else if (message.type === "shape:updated" && message.roomId === this.roomId) {
+            const updatedShape = shapeFromRecord(message.shape);
+            this.existingShapes = this.existingShapes.map((shape) => (
+                shape.id === updatedShape.id ? updatedShape : shape
+            ));
+            if (this.selectedShapeId === updatedShape.id) {
+                this.onSelectionChange(updatedShape);
+            }
+            this.clearCanvas();
+        } else if (message.type === "shape:deleted" && message.roomId === this.roomId) {
+            this.existingShapes = this.existingShapes.filter((shape) => shape.id !== message.shapeId);
+            if (this.selectedShapeId === message.shapeId) {
+                this.setSelectedShape(null);
+            }
+            this.clearCanvas();
+        }
+    };
 
     socket: WebSocket;
 
@@ -60,6 +82,7 @@ export class Game {
         this.canvas.removeEventListener("wheel", this.wheelHandler);
         window.removeEventListener("keydown", this.keyDownHandler);
         window.removeEventListener("keyup", this.keyUpHandler);
+        this.socket.removeEventListener("message", this.socketMessageHandler);
     }
 
     setTool(tool: Tool) {
@@ -111,28 +134,7 @@ export class Game {
     }
 
     initHandlers() {
-        this.socket.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.type === "shape:created" && message.roomId === this.roomId) {
-                this.existingShapes.push(shapeFromRecord(message.shape));
-                this.clearCanvas();
-            } else if (message.type === "shape:updated" && message.roomId === this.roomId) {
-                const updatedShape = shapeFromRecord(message.shape);
-                this.existingShapes = this.existingShapes.map((shape) => (
-                    shape.id === updatedShape.id ? updatedShape : shape
-                ));
-                if (this.selectedShapeId === updatedShape.id) {
-                    this.onSelectionChange(updatedShape);
-                }
-                this.clearCanvas();
-            } else if (message.type === "shape:deleted" && message.roomId === this.roomId) {
-                this.existingShapes = this.existingShapes.filter((shape) => shape.id !== message.shapeId);
-                if (this.selectedShapeId === message.shapeId) {
-                    this.setSelectedShape(null);
-                }
-                this.clearCanvas();
-            }
-        };
+        this.socket.addEventListener("message", this.socketMessageHandler);
     }
 
     // Convert screen coords to world coords (accounts for pan/zoom)
