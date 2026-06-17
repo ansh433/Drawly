@@ -166,14 +166,23 @@ export function RoomChat({
                         {messages.map((message) => (
                             <div
                                 key={message.id}
-                                className={`rounded-base border-2 border-border bg-background px-3 py-2 shadow-shadow ${
-                                    message.pending ? "opacity-70" : ""
-                                }`}
+                                className={`flex ${message.userId === currentUser?.id ? "justify-end" : "justify-start"}`}
                             >
-                                <p className="text-sm font-base text-foreground">{message.message}</p>
-                                <p className="mt-1 text-[11px] font-base text-foreground/45">
-                                    {message.pending ? "Sending..." : formatMessageTime(message.createdAt)}
-                                </p>
+                                <div
+                                    className={`max-w-[85%] rounded-base border-2 border-border px-3 py-2 shadow-shadow ${
+                                        message.userId === currentUser?.id
+                                            ? "bg-main text-main-foreground"
+                                            : "bg-background text-foreground"
+                                    } ${message.pending ? "opacity-70" : ""}`}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs font-heading">{message.userName}</p>
+                                        <p className={`text-[11px] font-base ${message.userId === currentUser?.id ? "text-main-foreground/70" : "text-foreground/45"}`}>
+                                            {message.pending ? "Sending..." : formatMessageTime(message.createdAt)}
+                                        </p>
+                                    </div>
+                                    <p className="mt-1 text-sm font-base">{message.message}</p>
+                                </div>
                             </div>
                         ))}
                         <div ref={bottomRef} />
