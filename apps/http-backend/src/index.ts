@@ -251,9 +251,24 @@ app.get("/shapes/:roomId", async (req, res) => {
 });
 
 app.get("/room/:slug", async (req, res) => {
-    const slug = req.params.slug;
+    const roomIdentifier = req.params.slug.trim();
+    const roomId = Number(roomIdentifier);
+
+    if (Number.isInteger(roomId)) {
+        const room = await prismaClient.room.findUnique({
+            where: { id: roomId }
+        });
+        res.json({ room });
+        return;
+    }
+
     const room = await prismaClient.room.findFirst({
-        where: { slug }
+        where: {
+            slug: {
+                equals: roomIdentifier,
+                mode: "insensitive"
+            }
+        }
     });
     res.json({ room });
 });

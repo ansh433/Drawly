@@ -57,7 +57,7 @@ export async function signup(username: string, password: string, name: string): 
 
 export async function getRoom(slug: string) {
     const token = localStorage.getItem("token");
-    const res = await axios.get(`${HTTP_BACKEND}/room/${slug}`, {
+    const res = await axios.get(`${HTTP_BACKEND}/room/${encodeURIComponent(slug)}`, {
         headers: {
             Authorization: `Bearer ${token}`
         }
