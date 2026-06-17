@@ -8,6 +8,11 @@ import { Input } from "./ui/input";
 import { getChatMessages } from "@/draw/http";
 import type { ChatMessage } from "@repo/common/types";
 
+type DisplayMessage = ChatMessage & {
+    clientMessageId?: string;
+    pending?: boolean;
+};
+
 function formatMessageTime(createdAt: string) {
     return new Date(createdAt).toLocaleTimeString([], {
         hour: "numeric",
@@ -15,8 +20,8 @@ function formatMessageTime(createdAt: string) {
     });
 }
 
-function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]) {
-    const byId = new Map<number, ChatMessage>();
+function mergeMessages(existing: DisplayMessage[], incoming: DisplayMessage[]) {
+    const byId = new Map<number, DisplayMessage>();
 
     [...existing, ...incoming].forEach((message) => {
         byId.set(message.id, message);
@@ -41,7 +46,7 @@ export function RoomChat({
     roomId: string;
     socket: WebSocket;
 }) {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<DisplayMessage[]>([]);
     const [draft, setDraft] = useState("");
     const [loading, setLoading] = useState(true);
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -75,7 +80,13 @@ export function RoomChat({
                 const parsed = JSON.parse(event.data);
 
                 if (parsed.type === "chat:message" && parsed.roomId === roomId) {
-                    setMessages((current) => [...current, parsed.message]);
+                    setMessages((current) => {
+                        const withoutPending = current.filter(
+                            (message) => message.clientMessageId !== parsed.clientMessageId
+                        );
+
+                        return mergeMessages(withoutPending, [parsed.message]);
+                    });
                 }
             } catch {
                 // Ignore non-chat payloads here.
@@ -101,13 +112,31 @@ export function RoomChat({
             return;
         }
 
-        socket.send(JSON.stringify({
-            type: "chat:send",
-            roomId,
-            message
-        }));
+        const clientMessageId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+        const pendingMessage: DisplayMessage = {
+            id: Number(`-${Date.now()}`),
+            roomId: Number(roomId),
+            userId: "pending",
+            message,
+            createdAt: new Date().toISOString(),
+            clientMessageId,
+            pending: true
+        };
 
-        setDraft("");
+        setMessages((current) => mergeMessages(current, [pendingMessage]));
+
+        try {
+            socket.send(JSON.stringify({
+                type: "chat:send",
+                roomId,
+                message,
+                clientMessageId
+            }));
+
+            setDraft("");
+        } catch {
+            setMessages((current) => current.filter((entry) => entry.clientMessageId !== clientMessageId));
+        }
     }
 
     const emptyState = loading
@@ -134,11 +163,13 @@ export function RoomChat({
                         {messages.map((message) => (
                             <div
                                 key={message.id}
-                                className="rounded-base border-2 border-border bg-background px-3 py-2 shadow-shadow"
+                                className={`rounded-base border-2 border-border bg-background px-3 py-2 shadow-shadow ${
+                                    message.pending ? "opacity-70" : ""
+                                }`}
                             >
                                 <p className="text-sm font-base text-foreground">{message.message}</p>
                                 <p className="mt-1 text-[11px] font-base text-foreground/45">
-                                    {formatMessageTime(message.createdAt)}
+                                    {message.pending ? "Sending..." : formatMessageTime(message.createdAt)}
                                 </p>
                             </div>
                         ))}

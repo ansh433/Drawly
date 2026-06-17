@@ -127,7 +127,8 @@ wss.on('connection', function connection(ws, request) {
       broadcastToRoom(message.roomId, {
         type: "chat:message",
         roomId: message.roomId,
-        message: chatMessage
+        message: chatMessage,
+        clientMessageId: message.clientMessageId
       });
     }
 

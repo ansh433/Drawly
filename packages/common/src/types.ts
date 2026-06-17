@@ -179,13 +179,15 @@ export const ShapeDeletedEventSchema = z.object({
 export const ChatSendEventSchema = z.object({
     type: z.literal("chat:send"),
     roomId: RoomIdSchema,
-    message: z.string().min(1).max(2000)
+    message: z.string().min(1).max(2000),
+    clientMessageId: z.string().min(1)
 });
 
 export const ChatMessageEventSchema = z.object({
     type: z.literal("chat:message"),
     roomId: RoomIdSchema,
-    message: ChatMessageSchema
+    message: ChatMessageSchema,
+    clientMessageId: z.string().min(1)
 });
 
 export const CursorUpdateEventSchema = z.object({
