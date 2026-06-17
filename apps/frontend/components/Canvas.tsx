@@ -88,11 +88,9 @@ export function Canvas({
         }
     }
 
-    return <div style={{
-        height: "100vh",
-        overflow: "hidden"
-    }}>
+    return <div className="relative h-screen overflow-hidden">
         <canvas ref={canvasRef} width={typeof window !== 'undefined' ? window.innerWidth : 1920} height={typeof window !== 'undefined' ? window.innerHeight : 1080}></canvas>
+        <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-3">
         <Topbar
             setSelectedTool={setSelectedTool}
             selectedTool={selectedTool}
@@ -101,6 +99,7 @@ export function Canvas({
             shapeStyle={shapeStyle}
             setShapeStyle={updateShapeStyle}
         />
+        </div>
     </div>
 }
 
@@ -112,12 +111,7 @@ function Topbar({selectedTool, setSelectedTool, selectedShapeId, onDeleteSelecte
     shapeStyle: ShapeStyle,
     setShapeStyle: (style: ShapeStyle) => void
 }) {
-    return <div style={{
-            position: "fixed",
-            top: 10,
-            left: 10
-        }}>
-            <div className="flex max-w-[calc(100vw-20px)] flex-wrap items-center gap-2 rounded-base border-2 border-border bg-secondary-background p-2 shadow-shadow">
+    return <div className="pointer-events-auto flex max-w-[calc(100vw-6rem)] flex-wrap items-center gap-2 rounded-base border-2 border-border bg-secondary-background p-2 shadow-shadow">
                 <IconButton
                     onClick={() => {
                         setSelectedTool("select")
@@ -166,7 +160,6 @@ function Topbar({selectedTool, setSelectedTool, selectedShapeId, onDeleteSelecte
                     strokeWidth={shapeStyle.strokeWidth}
                     setStrokeWidth={(strokeWidth) => setShapeStyle({ ...shapeStyle, strokeWidth })}
                 />
-            </div>
         </div>
 }
 
