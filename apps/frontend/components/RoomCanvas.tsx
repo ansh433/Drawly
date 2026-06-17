@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Canvas } from "./Canvas";
 import { RoomChat } from "./RoomChat";
+import { getCurrentUser, type CurrentUser } from "@/draw/http";
 
 export function RoomCanvas({ roomId }: { roomId: string }) {
   const router = useRouter();
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -29,6 +31,28 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
     return () => ws.close();
   }, [roomId, router]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadCurrentUser() {
+      try {
+        const user = await getCurrentUser();
+        if (active) {
+          setCurrentUser(user);
+        }
+      } catch {
+        localStorage.removeItem("token");
+        router.push("/signin");
+      }
+    }
+
+    loadCurrentUser();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
   if (!socket) {
     return (
       <div className="w-screen h-screen bg-black flex flex-col items-center justify-center gap-4">
@@ -41,7 +65,11 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <Canvas roomId={roomId} socket={socket} />
-      <RoomChat roomId={roomId} socket={socket} />
+      <RoomChat
+        roomId={roomId}
+        socket={socket}
+        currentUser={currentUser}
+      />
     </div>
   );
 }

@@ -170,6 +170,30 @@ app.get("/rooms", middleware, async (req, res) => {
     }
 });
 
+app.get("/me", middleware, async (req, res) => {
+    const userId = (req as any).userId;
+
+    try {
+        const user = await prismaClient.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                name: true
+            }
+        });
+
+        if (!user) {
+            res.status(404).json({ message: "User not found" });
+            return;
+        }
+
+        res.json({ user });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch user" });
+    }
+});
+
 app.get("/chats/:roomId", async (req, res) => {
     try {
         const roomId = Number(req.params.roomId);
@@ -180,10 +204,26 @@ app.get("/chats/:roomId", async (req, res) => {
 
         const messages = await prismaClient.chat.findMany({
             where: { roomId },
+            include: {
+                user: {
+                    select: {
+                        name: true
+                    }
+                }
+            },
             orderBy: { createdAt: "asc" },
             take: 1000
         });
-        res.json({ messages });
+        res.json({
+            messages: messages.map((message) => ({
+                id: message.id,
+                roomId: message.roomId,
+                userId: message.userId,
+                userName: message.user.name,
+                message: message.message,
+                createdAt: message.createdAt.toISOString()
+            }))
+        });
     } catch(e) {
         res.status(500).json({ messages: [] });
     }

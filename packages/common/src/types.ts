@@ -118,6 +118,7 @@ export const ChatMessageSchema = z.object({
     id: z.number(),
     roomId: z.number(),
     userId: z.string(),
+    userName: z.string(),
     message: z.string(),
     createdAt: z.string()
 });

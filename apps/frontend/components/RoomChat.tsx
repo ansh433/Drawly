@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { MessageSquareMore, Send } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { getChatMessages } from "@/draw/http";
+import { getChatMessages, type CurrentUser } from "@/draw/http";
 import type { ChatMessage } from "@repo/common/types";
 
 type DisplayMessage = ChatMessage & {
@@ -41,10 +41,12 @@ function mergeMessages(existing: DisplayMessage[], incoming: DisplayMessage[]) {
 
 export function RoomChat({
     roomId,
-    socket
+    socket,
+    currentUser
 }: {
     roomId: string;
     socket: WebSocket;
+    currentUser: CurrentUser | null;
 }) {
     const [messages, setMessages] = useState<DisplayMessage[]>([]);
     const [draft, setDraft] = useState("");
@@ -116,7 +118,8 @@ export function RoomChat({
         const pendingMessage: DisplayMessage = {
             id: Number(`-${Date.now()}`),
             roomId: Number(roomId),
-            userId: "pending",
+            userId: currentUser?.id ?? "pending",
+            userName: currentUser?.name ?? "You",
             message,
             createdAt: new Date().toISOString(),
             clientMessageId,

@@ -11,7 +11,8 @@ const wss = new WebSocketServer({ port: 8080 });
 interface User {
   ws: WebSocket,
   rooms: string[],
-  userId: string
+  userId: string,
+  userName: string
 }
 
 const users: User[] = [];
@@ -60,7 +61,7 @@ function checkUser(token: string): string | null {
   return null;
 }
 
-wss.on('connection', function connection(ws, request) {
+wss.on('connection', async function connection(ws, request) {
   const url = request.url;
   if (!url) {
     return;
@@ -74,8 +75,21 @@ wss.on('connection', function connection(ws, request) {
     return null;
   }
 
+  const user = await prismaClient.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true
+    }
+  });
+
+  if (!user) {
+    ws.close();
+    return null;
+  }
+
   users.push({
     userId,
+    userName: user.name,
     rooms: [],
     ws
   })
@@ -127,7 +141,14 @@ wss.on('connection', function connection(ws, request) {
       broadcastToRoom(message.roomId, {
         type: "chat:message",
         roomId: message.roomId,
-        message: chatMessage,
+        message: {
+          id: chatMessage.id,
+          roomId: chatMessage.roomId,
+          userId: chatMessage.userId,
+          userName: user.name,
+          message: chatMessage.message,
+          createdAt: chatMessage.createdAt.toISOString()
+        },
         clientMessageId: message.clientMessageId
       });
     }

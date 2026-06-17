@@ -3,6 +3,12 @@ import type { ChatMessage } from "@repo/common/types";
 import axios from "axios";
 import { PersistedShape, shapeFromRecord } from "./shapes";
 
+export type CurrentUser = {
+    id: string;
+    name: string;
+    email: string;
+};
+
 export async function getExistingShapes(roomId: string) {
     const res = await axios.get(`${HTTP_BACKEND}/shapes/${roomId}`);
     const shapes = res.data.shapes as PersistedShape[];
@@ -13,6 +19,14 @@ export async function getExistingShapes(roomId: string) {
 export async function getChatMessages(roomId: string): Promise<ChatMessage[]> {
     const res = await axios.get(`${HTTP_BACKEND}/chats/${roomId}`);
     return res.data.messages as ChatMessage[];
+}
+
+export async function getCurrentUser(): Promise<CurrentUser> {
+    const token = localStorage.getItem("token");
+    const res = await axios.get(`${HTTP_BACKEND}/me`, {
+        headers: { authorization: token ?? "" }
+    });
+    return res.data.user as CurrentUser;
 }
 
 export async function getRooms(): Promise<{ id: number; slug: string; createdAt: string }[]> {
