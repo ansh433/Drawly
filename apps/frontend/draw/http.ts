@@ -1,4 +1,5 @@
 import { HTTP_BACKEND } from "@/config";
+import type { ChatMessage } from "@repo/common/types";
 import axios from "axios";
 import { PersistedShape, shapeFromRecord } from "./shapes";
 
@@ -7,6 +8,11 @@ export async function getExistingShapes(roomId: string) {
     const shapes = res.data.shapes as PersistedShape[];
 
     return shapes.map(shapeFromRecord);
+}
+
+export async function getChatMessages(roomId: string): Promise<ChatMessage[]> {
+    const res = await axios.get(`${HTTP_BACKEND}/chats/${roomId}`);
+    return res.data.messages as ChatMessage[];
 }
 
 export async function getRooms(): Promise<{ id: number; slug: string; createdAt: string }[]> {

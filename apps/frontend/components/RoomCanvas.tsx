@@ -4,6 +4,7 @@ import { WS_URL } from "@/config";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Canvas } from "./Canvas";
+import { RoomChat } from "./RoomChat";
 
 export function RoomCanvas({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -37,5 +38,10 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
     );
   }
 
-  return <Canvas roomId={roomId} socket={socket} />;
+  return (
+    <div className="relative h-screen w-screen overflow-hidden">
+      <Canvas roomId={roomId} socket={socket} />
+      <RoomChat roomId={roomId} socket={socket} />
+    </div>
+  );
 }

@@ -110,6 +110,27 @@ wss.on('connection', function connection(ws, request) {
       user.rooms = user.rooms.filter(x => x !== message.roomId);
     }
 
+    if (message.type === "chat:send") {
+      const roomId = Number(message.roomId);
+      if (!Number.isInteger(roomId)) {
+        return;
+      }
+
+      const chatMessage = await prismaClient.chat.create({
+        data: {
+          roomId,
+          userId,
+          message: message.message.trim()
+        }
+      });
+
+      broadcastToRoom(message.roomId, {
+        type: "chat:message",
+        roomId: message.roomId,
+        message: chatMessage
+      });
+    }
+
     if (message.type === "shape:create") {
       const roomId = Number(message.roomId);
       if (!Number.isInteger(roomId)) {
