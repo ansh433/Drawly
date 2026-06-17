@@ -42,10 +42,12 @@ function mergeMessages(existing: DisplayMessage[], incoming: DisplayMessage[]) {
 export function RoomChat({
     roomId,
     socket,
+    open,
     currentUser
 }: {
     roomId: string;
     socket: WebSocket;
+    open: boolean;
     currentUser: CurrentUser | null;
 }) {
     const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -147,14 +149,18 @@ export function RoomChat({
         : "No messages yet. Say hello.";
 
     return (
-        <aside className="fixed right-0 top-0 flex h-screen w-[20rem] flex-col border-l-2 border-border bg-secondary-background shadow-shadow">
+        <aside
+            aria-hidden={!open}
+            className={`fixed right-0 top-0 z-40 flex h-screen w-[20rem] flex-col border-l-2 border-border bg-secondary-background shadow-shadow transition-transform duration-200 ${
+                open ? "translate-x-0 visible" : "translate-x-full invisible"
+            }`}
+        >
             <div className="flex items-center gap-2 border-b-2 border-border px-4 py-3">
                 <div className="flex size-8 items-center justify-center rounded-base border-2 border-border bg-background">
                     <MessageSquareMore className="size-4" />
                 </div>
                 <div>
                     <p className="text-sm font-heading">Room chat</p>
-                    <p className="text-xs font-base text-foreground/60">Messages only, no drawings</p>
                 </div>
             </div>
 

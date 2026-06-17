@@ -5,11 +5,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Canvas } from "./Canvas";
 import { RoomChat } from "./RoomChat";
+import { Button } from "./ui/button";
+import { MessageSquareMore, X } from "lucide-react";
 import { getCurrentUser, type CurrentUser } from "@/draw/http";
 
 export function RoomCanvas({ roomId }: { roomId: string }) {
   const router = useRouter();
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
@@ -65,9 +68,22 @@ export function RoomCanvas({ roomId }: { roomId: string }) {
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <Canvas roomId={roomId} socket={socket} />
+      <div className="fixed right-3 top-3 z-50">
+        <Button
+          type="button"
+          variant="neutral"
+          size="icon"
+          aria-label={chatOpen ? "Close chat" : "Open chat"}
+          title={chatOpen ? "Close chat" : "Open chat"}
+          onClick={() => setChatOpen((current) => !current)}
+        >
+          {chatOpen ? <X className="size-4" /> : <MessageSquareMore className="size-4" />}
+        </Button>
+      </div>
       <RoomChat
         roomId={roomId}
         socket={socket}
+        open={chatOpen}
         currentUser={currentUser}
       />
     </div>
