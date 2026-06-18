@@ -1,118 +1,193 @@
-# ExcaliDraw
+Here is the raw Markdown you can copy-paste directly into `README.md`:
 
-ExcaliDraw is a collaborative whiteboard monorepo. The primary app, `apps/frontend`, is a Next.js canvas experience where users can sign up, create or join rooms, draw shapes in real time, and reload persisted drawings from the database.
+```markdown
+# Drawly
+
+> Built a real-time collaborative whiteboard with chat and persisted rooms.
+
+Drawly is a collaborative drawing app where users can create rooms, draw shapes on a shared canvas, and chat with other people in the same room. It supports account signup/signin, room creation/joining, real-time drawing updates over WebSockets, and persisted canvas/chat history through PostgreSQL.
+
+It gives small teams, students, or collaborators a browser-based space to sketch ideas together without needing a heavyweight design tool. The app combines drawing and room chat so discussion and visual work happen in the same place.
+
+---
+
+## Features
+
+- **Room-based collaboration** — Create or join rooms with a unique ID
+- **Real-time drawing** — Draw rectangles, circles, and freehand strokes with live sync
+- **Shape styling** — Customize fill, stroke color, and stroke width
+- **Shape manipulation** — Select, move, restyle, and delete shapes
+- **Integrated chat** — Room chat with optimistic sending, message history, and sender attribution
+- **Persistent canvas** — Shapes and chat messages survive page refreshes
+- **JWT authentication** — Secure signup/signin with password validation
+- **Pan & zoom** — Navigate large canvases with mouse/touch controls
+
+---
 
 ## Tech Stack
 
-- **Frontend:** Next.js, React, Tailwind CSS, Radix UI, Framer Motion
-- **HTTP API:** Express, JWT auth, bcrypt, Prisma
-- **Realtime:** WebSocket server with `ws`
-- **Database:** PostgreSQL via Prisma
-- **Workspace:** pnpm workspaces and Turborepo
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| **Canvas Engine** | Custom imperative HTML5 Canvas engine |
+| **HTTP Backend** | Express 5, Node.js, TypeScript |
+| **WebSocket Backend** | `ws` library, Node.js |
+| **Database** | PostgreSQL (JSONB for shape data) |
+| **ORM** | Prisma 7 |
+| **Validation** | Zod (shared across frontend & backend) |
+| **Auth** | JWT, bcrypt |
+| **Monorepo** | pnpm workspaces, Turbo |
+| **Deployment** | Vercel (frontend), Render/similar (backends) |
+
+---
+
+## Architecture
+
+```
+┌─────────────┐      HTTP/REST       ┌─────────────────┐
+│   Next.js   │◄────────────────────►│  Express Backend  │
+│  Frontend   │   (auth, rooms,      │   (port 3002)     │
+│ (port 3000) │    history APIs)     │                   │
+└──────┬──────┘                      └─────────┬─────────┘
+       │                                       │
+       │ WebSocket (ws)                        │ Prisma
+       │ (live drawing & chat)                 │ (ORM)
+       ▼                                       ▼
+┌─────────────┐                      ┌─────────────────┐
+│  WS Backend │                      │    PostgreSQL   │
+│ (port 8080) │                      │   (JSONB shapes) │
+└─────────────┘                      └─────────────────┘
+```
+
+**Data Flow:**
+
+1. Users sign up/sign in via HTTP API → receive JWT → stored in `localStorage`
+2. Frontend opens WebSocket with `?token=<jwt>` and sends `join_room`
+3. Canvas loads existing shapes via `GET /shapes/:roomId`
+4. Drawing events (`shape:create`, `shape:update`, `shape:delete`) are sent over WebSocket
+5. Backend validates, persists to PostgreSQL, and broadcasts to all room members
+6. Chat uses optimistic UI with `clientMessageId` reconciliation
+
+---
 
 ## Project Structure
 
-```txt
-apps/
-  frontend/      Main Drawly/ExcaliDraw web app
-  http-backend/  Express API for auth, rooms, and persisted canvas messages
-  ws-backend/    WebSocket server for realtime room updates
-  web/           Secondary Next.js app in the workspace
-packages/
-  db/            Prisma schema, migrations, generated client, and DB exports
-  common/        Shared Zod validation schemas
-  backend-common/Shared backend constants
-  ui/            Shared React UI primitives
+```
+.
+├── apps/
+│   ├── frontend/          # Next.js app (UI, canvas, chat)
+│   ├── http-backend/      # Express REST API
+│   ├── ws-backend/        # WebSocket server
+│   └── web/               # (legacy/stale app)
+├── packages/
+│   ├── common/            # Shared Zod schemas & types
+│   ├── db/                # Prisma schema & client
+│   ├── ui/                # Shared UI components
+│   └── backend-common/    # Shared backend config
+└── package.json           # pnpm workspace root
 ```
 
-## Prerequisites
+---
 
-- Node.js 20 or newer
-- pnpm 9
+## Getting Started
+
+### Prerequisites
+
+- Node.js ≥ 20
 - PostgreSQL database
+- pnpm
 
-## Setup
+### Installation
 
-Install dependencies:
-
-```sh
+```bash
+# Install dependencies
 pnpm install
+
+# Set up environment variables
+# apps/http-backend/.env
+DATABASE_URL="postgresql://user:pass@localhost:5432/drawly"
+JWT_SECRET="your-secret-key"
+PORT=3002
+
+# apps/ws-backend/.env
+DATABASE_URL="postgresql://user:pass@localhost:5432/drawly"
+JWT_SECRET="your-secret-key"
+PORT=8080
+
+# apps/frontend/.env
+NEXT_PUBLIC_HTTP_BACKEND="http://localhost:3002"
+NEXT_PUBLIC_WS_BACKEND="ws://localhost:8080"
 ```
 
-Set the database URL in your shell before running backend or Prisma commands:
+### Database Setup
 
-```sh
-export DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/excalidraw"
-```
-
-The frontend defaults to the local backend URLs below:
-
-```sh
-NEXT_PUBLIC_HTTP_BACKEND=http://localhost:3002
-NEXT_PUBLIC_WS_URL=ws://localhost:8080
-```
-
-You only need to set those frontend variables if your backend runs somewhere else. The HTTP backend also accepts `FRONTEND_URL` for an additional allowed CORS origin.
-
-Generate the Prisma client and build the database package:
-
-```sh
-pnpm --filter @repo/db build
-```
-
-Run database migrations from the database package:
-
-```sh
+```bash
+# Run migrations
 pnpm --filter @repo/db exec prisma migrate deploy
+
+# Generate Prisma client
+pnpm --filter @repo/db exec prisma generate
 ```
 
-## Development
+### Development
 
-Run the main services in separate terminals:
+```bash
+# Run all apps in dev mode
+pnpm dev
 
-```sh
-pnpm --filter @repo/db build
+# Or run individually
+pnpm --filter frontend dev
 pnpm --filter http-backend dev
 pnpm --filter ws-backend dev
-pnpm --filter frontend dev
 ```
 
-Default local ports:
+### Build
 
-- Frontend: `http://localhost:3000`
-- HTTP backend: `http://localhost:3002`
-- WebSocket backend: `ws://localhost:8080`
-
-You can also run all workspace dev tasks through Turborepo:
-
-```sh
-pnpm dev
+```bash
+# Build all packages and apps
+pnpm build
 ```
 
-## Useful Commands
+---
 
-```sh
-pnpm build        # Build all apps and packages through Turborepo
-pnpm lint         # Run workspace lint tasks
-pnpm check-types  # Run workspace type checks
-pnpm format       # Format TS, TSX, and Markdown files
-```
+## Key Engineering Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **REST + WebSocket split** | HTTP handles auth/history (simple CRUD); WebSocket handles live collaboration (low latency broadcasts) |
+| **JSONB shape storage** | Flexible schema for rectangles, circles, and pencil strokes without table-per-shape migrations |
+| **Custom canvas engine** | Direct control over hit testing, pan/zoom, and WebSocket payloads; React/SVG would be too slow for this use case |
+| **Optimistic chat** | Immediate UI feedback with `clientMessageId` reconciliation against server broadcasts |
+| **Shared Zod schemas** | Frontend, HTTP backend, and WebSocket backend all use the same validation contracts |
+
+---
 
 ## API Overview
 
-The HTTP backend exposes:
+### HTTP Endpoints
 
-- `POST /signup` - create a user and return a JWT
-- `POST /signin` - authenticate and return a JWT
-- `POST /room` - create a room for the authenticated user
-- `GET /rooms` - list rooms owned by the authenticated user
-- `GET /room/:slug` - look up a room by slug
-- `GET /chats/:roomId` - fetch persisted canvas messages for a room
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/signup` | Create account |
+| `POST` | `/signin` | Authenticate |
+| `GET` | `/me` | Current user |
+| `POST` | `/room` | Create room |
+| `GET` | `/rooms` | List rooms |
+| `GET` | `/room/:slug` | Get room by slug |
+| `GET` | `/chats/:roomId` | Chat history (max 1000) |
+| `GET` | `/shapes/:roomId` | Shape history |
 
-The WebSocket backend expects a JWT query parameter:
+### WebSocket Events
 
-```txt
-ws://localhost:8080?token=<jwt>
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `join_room` | Client → Server | Join a room |
+| `shape:create` | Client → Server | Create a new shape |
+| `shape:update` | Client → Server | Update existing shape |
+| `shape:delete` | Client → Server | Delete a shape |
+| `chat:send` | Client → Server | Send chat message |
+| `shape:created` | Server → Client | Broadcast new shape |
+| `shape:updated` | Server → Client | Broadcast shape update |
+| `shape:deleted` | Server → Client | Broadcast shape deletion |
+| `chat:message` | Server → Client | Broadcast chat message |
 ```
-
-Clients send `join_room`, `leave_room`, and `chat` messages. Canvas shapes are persisted as chat messages and replayed when a room is reopened.
